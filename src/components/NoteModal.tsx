@@ -1,83 +1,139 @@
 import React, { useState, useEffect } from "react";
-import { Modal, Box, TextField, Button, CircularProgress } from "@mui/material";
-import { Note } from "../types/Note";
+import {
+	Modal,
+	Box,
+	TextField,
+	Button,
+	CircularProgress,
+	Stack,
+} from "@mui/material";
+import { NewNote } from "../types/Note";
 import { useNote } from "../hooks/useNote";
-import { useUpdateNote } from "../hooks/useNotes";
+import { useUpdateNote, useAddNote } from "../hooks/useNotes";
 
 interface NoteModalProps {
-  noteId: string | null;
-  onClose: () => void;
-  onSave: (updatedNote: Note) => void;
+	noteId: string | null;
+	isCreating: boolean;
+	onClose: () => void;
+	onSuccess: () => void;
 }
 
-const NoteModal: React.FC<NoteModalProps> = ({ noteId, onClose, onSave }) => {
-  const { data: note, isLoading, error } = useNote(noteId); // Fetch note
-  const updateNoteMutation = useUpdateNote(); // Mutation hook for saving
+const style = {
+	width: 400,
+	bgcolor: "white",
+	p: 3,
+	m: "auto",
+	mt: 10,
+	borderRadius: 2,
+	display: "flex",
+	flexDirection: "column",
+};
 
-  const [editedNote, setEditedNote] = useState<Note | null>(null);
+const NoteModal: React.FC<NoteModalProps> = ({
+	noteId,
+	isCreating,
+	onClose,
+	onSuccess,
+}) => {
+	const isEditMode = !!noteId;
 
-  useEffect(() => {
-    setEditedNote(note ?? null); // Prevents TypeScript issues
-  }, [note]);
+	const { data: note, isLoading, error } = useNote(noteId); // only used in edit mode
+	const updateNoteMutation = useUpdateNote();
+	const addNoteMutation = useAddNote();
 
-  const handleSave = () => {
-    if (!editedNote) return;
+	const [title, setTitle] = useState("");
+	const [content, setContent] = useState("");
 
-    updateNoteMutation.mutate(editedNote, {
-      onSuccess: () => {
-        onSave(editedNote);
-        onClose(); // Close modal after saving
-      },
-    });
-  };
+	useEffect(() => {
+		if (note && isEditMode) {
+			setTitle(note.title);
+			setContent(note.content.join("\n"));
+		} else if (!isEditMode) {
+			setTitle("");
+			setContent("");
+		}
+	}, [note, isEditMode, noteId]);
 
-  return (
-    <Modal open={!!noteId} onClose={onClose}>
-      <Box sx={{
-        width: 400,
-        bgcolor: "white",
-        p: 3,
-        m: "auto",
-        mt: 10,
-        borderRadius: 2,
-        display: "flex",
-        flexDirection: "column",
-      }}>
-        {isLoading ? (
-          <CircularProgress />
-        ) : error ? (
-          <p>Error loading note</p>
-        ) : editedNote ? (
-          <>
-            <TextField
-              fullWidth
-              label="Title"
-              variant="outlined"
-              value={editedNote?.title || ""}
-              onChange={(e) => setEditedNote((prev) => prev && { ...prev, title: e.target.value })}
-              sx={{ mb: 2 }}
-            />
-            <TextField
-              fullWidth
-              label="Content"
-              multiline
-              rows={4}
-              value={editedNote?.content?.join("\n") || ""}
-              onChange={(e) => setEditedNote((prev) => prev && { ...prev, content: e.target.value.split("\n") })}
-            />
-            <Button variant="contained" sx={{ mt: 2, mr: 2 }} onClick={handleSave}>
-              Save
-            </Button>
-            <Button variant="outlined" sx={{ mt: 2 }} onClick={onClose}>
-              Cancel
-            </Button>
-          </>
-        ) : (
-          <p>No note selected</p>
-        )}
-      </Box>
-    </Modal>
-  );
+	const handleSave = () => {
+		const contentArray = content.split("\n");
+
+		if (isEditMode && note) {
+			updateNoteMutation.mutate(
+				{
+					...note,
+					title,
+					content: contentArray,
+					updateAt: new Date(),
+				},
+				{
+					onSuccess: () => {
+						onSuccess();
+						onClose();
+					},
+				},
+			);
+		} else {
+			const newNote: NewNote = {
+				title,
+				content: contentArray,
+				status: "none",
+				type: "note",
+				labels: [],
+				backgroundColor: "#ffffff",
+				selectedDate: null,
+				user: "user123", // hardcoded or passed in later
+			};
+
+			addNoteMutation.mutate(newNote, {
+				onSuccess: () => {
+					onSuccess();
+					onClose();
+				},
+			});
+		}
+	};
+
+	return (
+		<Modal open={!!noteId || isCreating} onClose={onClose}>
+			<Box sx={style}>
+				{isEditMode && isLoading ? (
+					<CircularProgress />
+				) : isEditMode && error ? (
+					<p>Error loading note</p>
+				) : (
+					<>
+						<TextField
+							fullWidth
+							label="Title"
+							variant="outlined"
+							value={title}
+							onChange={(e) => setTitle(e.target.value)}
+							sx={{ mb: 2 }}
+						/>
+						<TextField
+							fullWidth
+							label="Content"
+							multiline
+							rows={4}
+							value={content}
+							onChange={(e) => setContent(e.target.value)}
+						/>
+						<Stack
+							direction="row"
+							justifyContent="flex-end"
+							spacing={1}
+							mt={2}
+						>
+							<Button onClick={onClose}>Cancel</Button>
+							<Button variant="contained" onClick={handleSave}>
+								{isEditMode ? "Update" : "Create"}
+							</Button>
+						</Stack>
+					</>
+				)}
+			</Box>
+		</Modal>
+	);
 };
 
 export default NoteModal;
