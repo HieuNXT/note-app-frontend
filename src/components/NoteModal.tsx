@@ -10,6 +10,7 @@ import {
 import { NewNote } from "../types/Note";
 import { useNote } from "../hooks/useNote";
 import { useUpdateNote, useAddNote } from "../hooks/useNotes";
+import RichTextEditor, { RichTextContent } from "./TextEditor";
 
 interface NoteModalProps {
 	noteId: string | null;
@@ -17,17 +18,6 @@ interface NoteModalProps {
 	onClose: () => void;
 	onSuccess: () => void;
 }
-
-const style = {
-	width: 400,
-	bgcolor: "white",
-	p: 3,
-	m: "auto",
-	mt: 10,
-	borderRadius: 2,
-	display: "flex",
-	flexDirection: "column",
-};
 
 const NoteModal: React.FC<NoteModalProps> = ({
 	noteId,
@@ -42,7 +32,7 @@ const NoteModal: React.FC<NoteModalProps> = ({
 	const addNoteMutation = useAddNote();
 
 	const [title, setTitle] = useState("");
-	const [content, setContent] = useState("");
+	const [content, setContent] = useState<RichTextContent>("");
 
 	useEffect(() => {
 		if (note && isEditMode) {
@@ -54,15 +44,16 @@ const NoteModal: React.FC<NoteModalProps> = ({
 		}
 	}, [note, isEditMode, noteId]);
 
+	const handleEditorChange = (updated: RichTextContent) => {
+		setContent(updated);
+	};
 	const handleSave = () => {
-		const contentArray = content.split("\n");
-
 		if (isEditMode && note) {
 			updateNoteMutation.mutate(
 				{
 					...note,
 					title,
-					content: contentArray,
+					content,
 					updateAt: new Date(),
 				},
 				{
@@ -75,7 +66,7 @@ const NoteModal: React.FC<NoteModalProps> = ({
 		} else {
 			const newNote: NewNote = {
 				title,
-				content: contentArray,
+				content,
 				status: "none",
 				type: "note",
 				labels: [],
@@ -95,7 +86,18 @@ const NoteModal: React.FC<NoteModalProps> = ({
 
 	return (
 		<Modal open={!!noteId || isCreating} onClose={onClose}>
-			<Box sx={style}>
+			<Box
+				sx={{
+					width: "50vw",
+					maxWidth: "none",
+					bgcolor: "background.paper",
+					p: 4,
+					margin: "auto",
+					mt: "10vh", // just for vertical centering
+					borderRadius: 2,
+					boxShadow: 24,
+				}}
+			>
 				{isEditMode && isLoading ? (
 					<CircularProgress />
 				) : isEditMode && error ? (
@@ -110,13 +112,9 @@ const NoteModal: React.FC<NoteModalProps> = ({
 							onChange={(e) => setTitle(e.target.value)}
 							sx={{ mb: 2 }}
 						/>
-						<TextField
-							fullWidth
-							label="Content"
-							multiline
-							rows={4}
-							value={content}
-							onChange={(e) => setContent(e.target.value)}
+						<RichTextEditor
+							content={content}
+							onChange={handleEditorChange}
 						/>
 						<Stack
 							direction="row"
